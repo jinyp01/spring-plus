@@ -20,7 +20,7 @@ import java.util.SplittableRandom;
 class UserSearchTest {
 
     private static final int TOTAL_COUNT = 1_000_000;
-    private static final int BATCH_SIZE = 5_000;
+    private static final int BATCH_SIZE = 10_000;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
