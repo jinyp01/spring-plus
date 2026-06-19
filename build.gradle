@@ -53,5 +53,18 @@ dependencies {
 }
 
 tasks.named('test') {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags 'bulk'
+    }
+}
+
+tasks.register('bulkUserTest', Test) {
+    group = 'verification'
+    description = 'Runs the 1,000,000-row JDBC bulk insert user search performance test.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    maxHeapSize = '2g'
+    useJUnitPlatform {
+        includeTags 'bulk'
+    }
 }
