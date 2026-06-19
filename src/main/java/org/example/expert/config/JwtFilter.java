@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.example.expert.domain.common.dto.AuthUser;
 import org.example.expert.domain.user.enums.UserRole;
 import org.springframework.util.StringUtils;
 import org.springframework.stereotype.Component;
@@ -48,32 +49,35 @@ public class JwtFilter implements Filter {
 
         try {
             String jwt = jwtUtil.substringToken(bearerJwt);
-
             Claims claims = jwtUtil.extractClaims(jwt);
             if (claims == null) {
                 httpResponse.sendError(HttpServletResponse.SC_BAD_REQUEST, "잘못된 JWT 토큰입니다.");
                 return;
             }
 
-            String userId = claims.getSubject();
+            // 1. 토큰에서 데이터 추출
+            Long userId = Long.parseLong(claims.getSubject());
             String email = claims.get("email", String.class);
-            String roleStr = claims.get("userRole", String.class);
-            UserRole userRole = UserRole.valueOf(roleStr);
+            UserRole userRole = UserRole.valueOf(claims.get("userRole", String.class));
 
-            httpRequest.setAttribute("userId", Long.parseLong(userId));
+            // 2. 컨트롤러가 기대하는 AuthUser 객체를 직접 생성 🎯
+            AuthUser authUser = new AuthUser(userId, email, userRole);
+
+            // 3. 기존 HttpServletRequest Attribute 기반 코드 호환용 설정 유지
+            httpRequest.setAttribute("userId", userId);
             httpRequest.setAttribute("email", email);
-            httpRequest.setAttribute("userRole", roleStr);
+            httpRequest.setAttribute("userRole", userRole.name());
 
-            String springSecurityRole = "ROLE_" + userRole.name(); // "ROLE_USER" 또는 "ROLE_ADMIN"
+            // 4. 🔥 시큐리티 컨텍스트의 Principal 자리에 생성한 authUser 객체를 통째로 주입!
+            String springSecurityRole = "ROLE_" + userRole.name();
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                    userId, // Principal (보통 유저 ID나 이메일)
+                    authUser, // 💡 중요: 문자열 대신 authUser 객체를 넘겨야 @AuthenticationPrincipal이 인식합니다.
                     null,
-                    List.of(new SimpleGrantedAuthority(springSecurityRole)) // 권한 부여
+                    List.of(new SimpleGrantedAuthority(springSecurityRole))
             );
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
             chain.doFilter(request, response);
-
         } catch (SecurityException | MalformedJwtException e) {
             log.error("Invalid JWT signature, 유효하지 않는 JWT 서명 입니다.", e);
             httpResponse.sendError(HttpServletResponse.SC_UNAUTHORIZED, "유효하지 않는 JWT 서명입니다.");
